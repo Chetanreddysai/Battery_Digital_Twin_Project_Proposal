@@ -1,0 +1,6 @@
+{
+  "rmse_degC": 0.01207,
+  "mae_degC": 0.00935,
+  "max_err_degC": 0.06124,
+  "latency_ms": 2.487
+}

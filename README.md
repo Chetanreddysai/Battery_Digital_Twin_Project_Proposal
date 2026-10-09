@@ -5,6 +5,7 @@
 [![PyBaMM](https://img.shields.io/badge/PyBaMM-26.9-brightgreen.svg)](https://pybamm.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-Deep%20Learning-orange.svg)](https://pytorch.org/)
 [![Multi-Agent](https://img.shields.io/badge/Multi--Agent-Autonomous%20BMS-purple.svg)](src/battery_agents.py)
+[![Streamlit](https://img.shields.io/badge/Dashboard-Streamlit%203D-red.svg)](app.py)
 [![RMSE](https://img.shields.io/badge/Core%20RMSE-0.0121%C2%B0C-brightgreen.svg)](models/pinn_metrics.json)
 
 ---
@@ -16,12 +17,14 @@ This project builds an AI-powered **Physics-Informed Neural Digital Twin** that 
 1. Ingests non-invasive surface measurements (Current $I$, Voltage $V$, Surface Temp $T_{\text{surf}}$).
 2. Uses a **Physics-Informed Residual Highway Network (PI-RHN)** constrained by radial heat conduction PDEs to deduce invisible 3D core temperatures in real time without interior sensors.
 3. Deploys an **Autonomous Multi-Agent System** that monitors physical consistency, detects internal short circuits in $<5\text{ ms}$, and dynamically modulates charging current to prevent thermal runaway.
+4. Provides an **Interactive 3D Web Dashboard** with real-time 3D battery cutaway rendering, fault injection testing, and live agent decision telemetry.
 
 ---
 
 ## 📁 Repository Structure
 ```
 battery-neural-digital-twin/
+├── app.py                                      # Step 4: Root entrypoint for Streamlit Dashboard
 ├── data/
 │   ├── battery_fast_charge_ground_truth.csv    # 600 time-step 2C CC-CV physics telemetry
 │   └── multi_agent_simulation_logs.csv         # Closed-loop multi-agent streaming logs
@@ -36,6 +39,7 @@ battery-neural-digital-twin/
 │   ├── pinn_core_inference_benchmark.png       # Step 2: 4-panel PINN performance benchmark
 │   └── multi_agent_supervisory_benchmark.png   # Step 3: 4-panel multi-agent control benchmark
 ├── src/
+│   ├── app_dashboard.py                        # Step 4: Interactive 3D Streamlit Dashboard
 │   ├── simulate_battery_physics.py             # Step 1: PyBaMM & radial thermal PDE engine
 │   ├── train_pinn_model.py                     # Step 2: PINN architecture & training pipeline
 │   ├── battery_agents.py                       # Step 3: 4 Cooperating autonomous agents
@@ -43,6 +47,22 @@ battery-neural-digital-twin/
 ├── README.md
 └── requirements.txt
 ```
+
+---
+
+## 🌐 Step 4: Interactive 3D Web Dashboard (Completed)
+
+To launch the interactive dashboard locally:
+```bash
+streamlit run app.py
+```
+
+### Dashboard Features:
+* **Interactive 3D Cylindrical Cutaway (Plotly 3D):** Rotate, pan, and zoom a full 3D visual rendering of the LG M50 21700 cell, visualizing the molten internal core temperature field reconstructed by the PINN in real time.
+* **Continuous Radial Cross-Section Curve $T(r)$:** Real-time 2D temperature profile from center axis ($r = 0\text{ mm}$) to outer casing ($r = 10.5\text{ mm}$).
+* **Telemetry Scrubber & Fast-Charging Scenarios:** Scrub through the 50-minute fast-charging cycle or jump directly to peak-heat events.
+* **Live Fault & Anomaly Injection:** Toggle simulated internal micro-shorts to observe the Diagnostic Critic and Supervisory Controller clamping current to trickle charge within $<5\text{ ms}$.
+* **Live Cooperating Agent Bus:** Status, inference latency, and action logs for all 4 agents.
 
 ---
 
@@ -93,42 +113,18 @@ python src/train_pinn_model.py
 
 ## 🤖 Step 3: Autonomous Multi-Agent Supervisory Control (Completed)
 The system deploys four cooperating agents collaborating over a streaming telemetry bus:
+* **Agent 1: DigitalTwinObserver** (Deduces 3D core temp in **0.658 ms**)
+* **Agent 2: DiagnosticCritic** (Detects micro-shorts & gradient drift in **$<5\text{ ms}$**)
+* **Agent 3: SupervisoryController** (Modulates charging current & coolant demand)
+* **Agent 4: TelemetryExplainer** (Outputs explainable engineering audit logs)
 
-```
-[Vehicle Telemetry] (Current, Voltage, Surface Temp)
-        │
-        ▼
-┌────────────────────────────────────────────────────────┐
-│  Agent 1: DigitalTwinObserver (PINN Neural Engine)     │  ──> Infers 3D core temp in 0.65 ms
-└────────────────────────────────────────────────────────┘
-        │
-        ▼
-┌────────────────────────────────────────────────────────┐
-│  Agent 2: DiagnosticCritic (Unsupervised Physics)      │  ──> Detects micro-shorts & gradient drift
-└────────────────────────────────────────────────────────┘
-        │
-        ▼
-┌────────────────────────────────────────────────────────┐
-│  Agent 3: SupervisoryController (Closed-Loop Policy)   │  ──> Modulates charging current & coolant
-└────────────────────────────────────────────────────────┘
-        │
-        ▼
-┌────────────────────────────────────────────────────────┐
-│  Agent 4: TelemetryExplainer (Diagnostics & Audit Log) │  ──> Outputs explainable engineering rationale
-└────────────────────────────────────────────────────────┘
-```
-
-### 📊 Step 3 Multi-Agent Simulation Benchmark:
-| Metric | Value | Significance |
-| :--- | :--- | :--- |
-| **Observer Step Latency** | **0.658 ms (median: 0.626 ms)** | ⚡ **Sub-millisecond inference** |
-| **Autonomous Interventions** | **83 dynamic control events** | Proactive thermal throttling & fault isolation |
-| **Micro-Short Detection Latency** | **< 5.0 ms** | Immediate current clamp before thermal runaway |
-| **Thermal Runaway Incidents** | **0 (100% Prevented)** | Safe fast-charging guaranteed |
-| **Total Energy Delivered** | **18.35 Wh (Full 5.0Ah cycle)** | Maximum charge speed preserved |
+### 📊 Step 3 Benchmark:
+* **Observer Latency:** 0.658 ms (Sub-millisecond)
+* **Autonomous Interventions:** 83 dynamic control events
+* **Thermal Runaway Incidents:** 0 (100% Prevented)
+* **Total Energy Delivered:** 18.35 Wh
 
 To run the multi-agent closed-loop simulation:
 ```bash
 python src/run_multi_agent_simulation.py
 ```
-Outputs are saved to `data/multi_agent_simulation_logs.csv` and `plots/multi_agent_supervisory_benchmark.png`.

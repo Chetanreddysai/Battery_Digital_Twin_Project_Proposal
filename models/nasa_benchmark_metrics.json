@@ -1,0 +1,8 @@
+{
+  "dataset": "NASA Ames PCoE Battery B0005",
+  "cell_type": "18650 Cylindrical Lithium-Ion (2.0 Ah)",
+  "rmse_degC": 0.3128,
+  "mae_degC": 0.2506,
+  "max_err_degC": 0.6047,
+  "latency_ms": 0.174
+}

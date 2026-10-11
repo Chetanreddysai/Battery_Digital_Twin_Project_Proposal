@@ -91,6 +91,11 @@ class DigitalTwinObserver:
         self.model.eval()
         
         self.r_max = self.scalers["r_max"]  # 0.0105 m
+        
+        # Warmup pass to eliminate PyTorch CPU first-call JIT/threading overhead
+        with torch.no_grad():
+            _ = self.model.forward_delta(torch.zeros((1, 4), dtype=torch.float32, device=self.device))
+
 
     def predict_state(self, telemetry: BatteryTelemetry) -> BatteryState:
         t0 = time.perf_counter()

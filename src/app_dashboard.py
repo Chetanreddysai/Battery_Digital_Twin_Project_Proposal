@@ -288,45 +288,71 @@ with st.sidebar:
 
     # Playback Controls
     st.markdown("##### ⏱️ Live Simulation Telemetry Stream")
-    play_col1, play_col2, play_col3 = st.columns([1, 1, 1])
+    play_col1, play_col2 = st.columns([1, 1])
     
     with play_col1:
-        if st.button("▶ Play" if not st.session_state.is_playing else "⏸ Pause", use_container_width=True):
+        if st.button("⏸ Pause" if st.session_state.is_playing else "▶ Play", use_container_width=True):
             st.session_state.is_playing = not st.session_state.is_playing
             st.rerun()
 
     with play_col2:
-        if st.button("🔄 Reset", use_container_width=True):
+        if st.button("🔄 Reset (0s)", use_container_width=True):
             st.session_state.step_idx = 0
             st.session_state.is_playing = False
             st.rerun()
 
-    with play_col3:
-        speed = st.selectbox("Speed", ["1x", "2x", "5x", "10x"], index=1, label_visibility="collapsed")
-        st.session_state.speed_multiplier = int(speed.replace("x", ""))
+    # Step manual frame forward / backward
+    step_c1, step_c2, step_c3 = st.columns([1, 1, 1])
+    with step_c1:
+        if st.button("⏮ -10s", use_container_width=True):
+            st.session_state.step_idx = max(0, st.session_state.step_idx - 2)
+            st.session_state.is_playing = False
+            st.rerun()
+    with step_c2:
+        if st.button("⏭ +10s", use_container_width=True):
+            st.session_state.step_idx = min(total_steps - 1, st.session_state.step_idx + 2)
+            st.session_state.is_playing = False
+            st.rerun()
+    with step_c3:
+        speed_opts = ["1x", "2x", "5x", "10x"]
+        curr_speed_str = f"{st.session_state.speed_multiplier}x"
+        default_idx = speed_opts.index(curr_speed_str) if curr_speed_str in speed_opts else 1
+        selected_speed = st.selectbox("Speed", speed_opts, index=default_idx, label_visibility="collapsed")
+        st.session_state.speed_multiplier = int(selected_speed.replace("x", ""))
 
-    # Scenario Jump Presets
+    # Scenario Jump Presets as responsive buttons
     st.markdown("##### 🎯 Quick Scenario Bookmarks")
-    scenario = st.radio(
-        "Jump to flight phase:",
-        ["Custom Timeline", "🚀 Cycle Initial Rest (0s)", "🔥 Peak Fast-Charge Stress (1200s)", "⚡ Micro-Short Defect Spike (1110s)", "🏁 Full Cycle Finish (3000s)"],
-        index=0
-    )
-    
-    if scenario == "🚀 Cycle Initial Rest (0s)":
-        st.session_state.step_idx = 0
-    elif scenario == "🔥 Peak Fast-Charge Stress (1200s)":
-        st.session_state.step_idx = 240
-    elif scenario == "⚡ Micro-Short Defect Spike (1110s)":
-        st.session_state.step_idx = 221
-    elif scenario == "🏁 Full Cycle Finish (3000s)":
-        st.session_state.step_idx = total_steps - 1
+    b_j1, b_j2 = st.columns(2)
+    with b_j1:
+        if st.button("🚀 Cycle Start (0s)", use_container_width=True):
+            st.session_state.step_idx = 0
+            st.session_state.is_playing = False
+            st.rerun()
+        if st.button("⚡ Defect Spike (1110s)", use_container_width=True):
+            st.session_state.step_idx = 221
+            st.session_state.is_playing = False
+            st.rerun()
+    with b_j2:
+        if st.button("🔥 Peak Heat (1200s)", use_container_width=True):
+            st.session_state.step_idx = 240
+            st.session_state.is_playing = False
+            st.rerun()
+        if st.button("🏁 Cycle Finish (3000s)", use_container_width=True):
+            st.session_state.step_idx = total_steps - 1
+            st.session_state.is_playing = False
+            st.rerun()
 
-    # Timeline scrubber
-    st.session_state.step_idx = st.slider(
+    # Timeline scrubber slider
+    slider_val = st.slider(
         "Mission Timestamp Scrubber",
-        0, total_steps - 1, st.session_state.step_idx, 1
+        min_value=0,
+        max_value=total_steps - 1,
+        value=st.session_state.step_idx,
+        step=1
     )
+    if slider_val != st.session_state.step_idx and not st.session_state.is_playing:
+        st.session_state.step_idx = slider_val
+        st.rerun()
 
     st.markdown("---")
     st.markdown("##### ⚙️ Physical Stress Injection")
@@ -342,14 +368,6 @@ with st.sidebar:
     - **Target MCU**: ESP32 / STM32F4 / ARM-M4
     """)
 
-
-# Advance step if playing
-if st.session_state.is_playing:
-    st.session_state.step_idx = min(st.session_state.step_idx + st.session_state.speed_multiplier, total_steps - 1)
-    time.sleep(0.08)
-    if st.session_state.step_idx >= total_steps - 1:
-        st.session_state.is_playing = False
-    st.rerun()
 
 
 # Extract active step telemetry
@@ -953,3 +971,16 @@ with tab_whatif:
 
 st.markdown("---")
 st.markdown("<div style='text-align: center; color: #64748b; font-size: 12px;'>Physics-Informed Neural Digital Twin (PI-NDT) | Autonomous Clean Energy & Aerospace AI Systems</div>", unsafe_allow_html=True)
+
+# ============================================================================
+# LIVE PLAYBACK AUTO-ADVANCE LOOP (Runs after entire UI has rendered)
+# ============================================================================
+if st.session_state.is_playing:
+    # Cadence delay: gives browser 450ms to comfortably render 3D WebGL scenes & process clicks
+    time.sleep(0.45)
+    advance_steps = max(1, st.session_state.speed_multiplier * 2)
+    st.session_state.step_idx = min(st.session_state.step_idx + advance_steps, total_steps - 1)
+    if st.session_state.step_idx >= total_steps - 1:
+        st.session_state.is_playing = False
+    st.rerun()
+

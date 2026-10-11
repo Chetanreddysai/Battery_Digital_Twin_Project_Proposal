@@ -531,12 +531,12 @@ with tab_3d:
         # 2. Jelly-Roll Spiral Layer 1 (Cathode/Anode active zone, r = 7.0 mm)
         X_jelly1 = 7.0 * np.cos(Theta_grid)
         Y_jelly1 = 7.0 * np.sin(Theta_grid)
-        T_jelly1 = curr_surf_t + (1.0 - (7.0 / 10.5)**2) * curr_delta_t
+        T_jelly1 = np.full_like(X_jelly1, curr_surf_t + (1.0 - (7.0 / 10.5)**2) * curr_delta_t)
 
         # 3. Inner Core Mandrel Zone (r = 2.5 mm)
         X_core = 2.5 * np.cos(Theta_grid)
         Y_core = 2.5 * np.sin(Theta_grid)
-        T_core = curr_surf_t + (1.0 - (2.5 / 10.5)**2) * curr_delta_t
+        T_core = np.full_like(X_core, curr_surf_t + (1.0 - (2.5 / 10.5)**2) * curr_delta_t)
 
         # 4. Cutaway Radial Slice Plane (theta = 0, along x-axis)
         r_slice = np.linspace(0, 10.5, 30)
@@ -548,6 +548,7 @@ with tab_3d:
         # 5. Cutaway Radial Slice Plane 2 (theta = 1.5 * pi, along -y axis)
         X_slice2 = np.zeros_like(R_slice)
         Y_slice2 = -R_slice
+        Z_slice2 = Z_slice
         T_slice2 = T_slice
 
         fig_3d = go.Figure()

@@ -1,7 +1,7 @@
 """
-⚡ Physics-Informed Neural Digital Twin (PI-NDT) — High-Performance CyberHUD Cockpit
-=====================================================================================
-Optimized for 60 FPS Smooth WebGL Rendering, Dynamic Subsystem Routing, and Instant Playback.
+⚡ Physics-Informed Neural Digital Twin (PI-NDT) — Crash-Proof CyberHUD Cockpit
+================================================================================
+Engineered for zero white screens, stable WebGL contexts, and instant interactivity.
 """
 
 import os
@@ -167,15 +167,6 @@ st.markdown("""
         gap: 4px;
     }
 
-    /* Top Playback Control Panel */
-    .playback-bar {
-        background: rgba(15, 23, 42, 0.5);
-        border: 1px solid rgba(56, 189, 248, 0.2);
-        border-radius: 10px;
-        padding: 10px 16px;
-        margin-bottom: 14px;
-    }
-
     /* Monospace Cyber Terminal */
     .terminal-container {
         background: #050811;
@@ -213,6 +204,17 @@ st.markdown("""
         border: 1px solid rgba(16, 185, 129, 0.35);
         border-radius: 12px;
         padding: 18px;
+    }
+
+    /* Navigation Radio Button Styling */
+    div[role="radiogroup"] {
+        display: flex;
+        flex-direction: row;
+        gap: 10px;
+        background: rgba(15, 23, 42, 0.6);
+        padding: 8px 12px;
+        border-radius: 12px;
+        border: 1px solid rgba(56, 189, 248, 0.2);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -296,7 +298,8 @@ def get_cached_nasa_figures():
         plot_bgcolor="rgba(15, 23, 42, 0.4)",
         font=dict(color="#cbd5e1"),
         margin=dict(l=20, r=20, b=20, t=20),
-        height=320
+        height=320,
+        uirevision="constant"
     )
 
     # Residuals plot
@@ -316,7 +319,8 @@ def get_cached_nasa_figures():
         plot_bgcolor="rgba(15, 23, 42, 0.4)",
         font=dict(color="#cbd5e1"),
         margin=dict(l=20, r=20, b=20, t=20),
-        height=320
+        height=320,
+        uirevision="constant"
     )
     return fig_p, fig_e
 
@@ -335,6 +339,8 @@ if "is_playing" not in st.session_state:
     st.session_state.is_playing = False
 if "speed_multiplier" not in st.session_state:
     st.session_state.speed_multiplier = 2
+if "active_subsystem" not in st.session_state:
+    st.session_state.active_subsystem = "🌐 3D Digital Twin CAD Cutaway"
 
 
 # ============================================================================
@@ -452,7 +458,8 @@ else:
 ctl_c1, ctl_c2, ctl_c3, ctl_c4, ctl_c5, ctl_c6 = st.columns([1.2, 1.2, 0.8, 0.8, 1.0, 1.2])
 
 with ctl_c1:
-    if st.button("▶ Play Stream" if not st.session_state.is_playing else "⏸ Pause Stream", use_container_width=True, type="primary" if not st.session_state.is_playing else "secondary"):
+    btn_label = "⏸ Pause Stream" if st.session_state.is_playing else "▶ Play Stream"
+    if st.button(btn_label, use_container_width=True, type="secondary" if st.session_state.is_playing else "primary"):
         st.session_state.is_playing = not st.session_state.is_playing
         st.rerun()
 
@@ -487,6 +494,7 @@ with ctl_c6:
     new_mult = speed_map[sel_spd_label]
     if new_mult != st.session_state.speed_multiplier:
         st.session_state.speed_multiplier = new_mult
+        st.session_state.is_playing = False
         st.rerun()
 
 # Timeline Scrubber Slider
@@ -498,8 +506,9 @@ slider_val = st.slider(
     step=1,
     label_visibility="collapsed"
 )
-if slider_val != st.session_state.step_idx and not st.session_state.is_playing:
+if slider_val != st.session_state.step_idx:
     st.session_state.step_idx = slider_val
+    st.session_state.is_playing = False
     st.rerun()
 
 st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
@@ -580,7 +589,7 @@ st.markdown("<div style='height: 14px;'></div>", unsafe_allow_html=True)
 
 
 # ============================================================================
-# DYNAMIC SUBSYSTEM SELECTOR (Only renders the active subsystem for 10x speed!)
+# CRASH-PROOF SUBSYSTEM NAVIGATION (st.radio CANNOT BE DESELECTED TO NONE!)
 # ============================================================================
 subsystem_options = [
     "🌐 3D Digital Twin CAD Cutaway",
@@ -590,19 +599,24 @@ subsystem_options = [
     "🧪 'What-If' Engineering Sandbox"
 ]
 
-selected_subsystem = st.segmented_control(
+current_subsystem_idx = 0
+if st.session_state.active_subsystem in subsystem_options:
+    current_subsystem_idx = subsystem_options.index(st.session_state.active_subsystem)
+
+selected_subsystem = st.radio(
     "Active Subsystem View",
     options=subsystem_options,
-    default=subsystem_options[0],
-    selection_mode="single",
+    index=current_subsystem_idx,
+    horizontal=True,
     label_visibility="collapsed"
 )
+st.session_state.active_subsystem = selected_subsystem or subsystem_options[0]
 
 
 # ----------------------------------------------------------------------------
 # SUBSYSTEM 1: 3D CYLINDRICAL CAD CUTAWAY & THERMAL FIELD
 # ----------------------------------------------------------------------------
-if selected_subsystem == "🌐 3D Digital Twin CAD Cutaway":
+if st.session_state.active_subsystem == "🌐 3D Digital Twin CAD Cutaway":
     col_cad, col_physics = st.columns([1.4, 1.0])
 
     with col_cad:
@@ -611,7 +625,6 @@ if selected_subsystem == "🌐 3D Digital Twin CAD Cutaway":
 
         view_opt = st.radio("Camera Angle Preset:", ["Isometric 3D Cutaway", "Axial Top-Down Core View", "Longitudinal Cross-Section"], horizontal=True)
 
-        # Ultra-efficient lightweight meshgrid geometry (24x15 instead of 40x25)
         num_theta = 24
         num_z = 15
         theta = np.linspace(0, 1.5 * np.pi, num_theta)
@@ -715,9 +728,10 @@ if selected_subsystem == "🌐 3D Digital Twin CAD Cutaway":
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
             margin=dict(l=0, r=0, b=0, t=10),
-            height=480
+            height=480,
+            uirevision="constant"
         )
-        st.plotly_chart(fig_3d, use_container_width=True)
+        st.plotly_chart(fig_3d, use_container_width=True, config={"displayModeBar": False, "responsive": True})
 
     with col_physics:
         st.markdown("##### 📈 Radial Thermal Cross-Section $T(r)$")
@@ -753,9 +767,10 @@ if selected_subsystem == "🌐 3D Digital Twin CAD Cutaway":
             plot_bgcolor="rgba(15, 23, 42, 0.4)",
             font=dict(color="#cbd5e1"),
             margin=dict(l=20, r=20, b=20, t=30),
-            height=280
+            height=280,
+            uirevision="constant"
         )
-        st.plotly_chart(fig_radial, use_container_width=True)
+        st.plotly_chart(fig_radial, use_container_width=True, config={"displayModeBar": False, "responsive": True})
 
         # Thermal State Summary Matrix
         st.markdown(f"""
@@ -783,7 +798,7 @@ if selected_subsystem == "🌐 3D Digital Twin CAD Cutaway":
 # ----------------------------------------------------------------------------
 # SUBSYSTEM 2: HEAD-TO-HEAD BATTLE: BLIND BMS VS. AI DIGITAL TWIN
 # ----------------------------------------------------------------------------
-elif selected_subsystem == "⚔️ Head-to-Head: Blind BMS vs. AI Twin":
+elif st.session_state.active_subsystem == "⚔️ Head-to-Head: Blind BMS vs. AI Twin":
     st.markdown("### ⚔️ The Safety Battle: Conventional Blind BMS vs. Physics-Informed Digital Twin")
     st.caption("Standard BMS systems observe surface temperature only, remaining blind to internal core thermal degradation.")
 
@@ -844,15 +859,16 @@ elif selected_subsystem == "⚔️ Head-to-Head: Blind BMS vs. AI Twin":
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(15, 23, 42, 0.4)",
         font=dict(color="#cbd5e1"),
-        margin=dict(l=20, r=20, b=20, t=40)
+        margin=dict(l=20, r=20, b=20, t=40),
+        uirevision="constant"
     )
-    st.plotly_chart(fig_battle, use_container_width=True)
+    st.plotly_chart(fig_battle, use_container_width=True, config={"displayModeBar": False, "responsive": True})
 
 
 # ----------------------------------------------------------------------------
 # SUBSYSTEM 3: MULTI-AGENT CYBER TERMINAL & TELEMETRY STREAM
 # ----------------------------------------------------------------------------
-elif selected_subsystem == "🤖 Multi-Agent Cyber Terminal":
+elif st.session_state.active_subsystem == "🤖 Multi-Agent Cyber Terminal":
     st.markdown("### 🤖 Live Multi-Agent Communication Bus")
     st.caption("Real-time asynchronous messaging stream across the 4 cooperating autonomous agents.")
 
@@ -903,7 +919,7 @@ elif selected_subsystem == "🤖 Multi-Agent Cyber Terminal":
 # ----------------------------------------------------------------------------
 # SUBSYSTEM 4: NASA AMES FLIGHT VALIDATION & HARDWARE BENCHMARKS
 # ----------------------------------------------------------------------------
-elif selected_subsystem == "📊 NASA Flight Validation & Hardware Benchmarks":
+elif st.session_state.active_subsystem == "📊 NASA Flight Validation & Hardware Benchmarks":
     st.markdown("### 📊 NASA Ames Real-World Flight Benchmark & Edge Hardware Performance")
     st.caption("Quantitative validation on real laboratory battery data from NASA Ames Prognostics Center of Excellence (Cell B0005) & Embedded Microcontroller Latency Profiling.")
 
@@ -912,11 +928,11 @@ elif selected_subsystem == "📊 NASA Flight Validation & Hardware Benchmarks":
     with n_col1:
         st.markdown("##### 🎯 Parity Plot: NASA Experimental Ground Truth vs. PINN Prediction")
         if fig_parity:
-            st.plotly_chart(fig_parity, use_container_width=True)
+            st.plotly_chart(fig_parity, use_container_width=True, config={"displayModeBar": False, "responsive": True})
     with n_col2:
         st.markdown("##### 📉 Error Residual Distribution")
         if fig_err:
-            st.plotly_chart(fig_err, use_container_width=True)
+            st.plotly_chart(fig_err, use_container_width=True, config={"displayModeBar": False, "responsive": True})
 
     st.markdown("##### ⚡ Microcontroller & Automotive Embedded Edge Benchmarks")
     edge_table = {
@@ -932,7 +948,7 @@ elif selected_subsystem == "📊 NASA Flight Validation & Hardware Benchmarks":
 # ----------------------------------------------------------------------------
 # SUBSYSTEM 5: 'WHAT-IF' BATTERY ENGINEERING SANDBOX
 # ----------------------------------------------------------------------------
-elif selected_subsystem == "🧪 'What-If' Engineering Sandbox":
+elif st.session_state.active_subsystem == "🧪 'What-If' Engineering Sandbox":
     st.markdown("### 🧪 'What-If' Battery Engineering & Stress Testing Sandbox")
     st.caption("Simulate different battery chemistries, extreme climates, and cooling architectures to forecast thermal stress before manufacturing.")
 
@@ -975,12 +991,12 @@ st.markdown("<div style='text-align: center; color: #64748b; font-size: 12px;'>P
 
 
 # ============================================================================
-# SMOOTH, HIGH-PERFORMANCE LIVE PLAYBACK AUTO-ADVANCE
+# SAFE, CRASH-PROOF LIVE STREAM ENGINE
 # ============================================================================
 if st.session_state.is_playing:
-    # 180ms delay gives smooth 5.5 FPS animation while remaining 100% responsive to button clicks
-    time.sleep(0.18)
-    step_jump = {1: 1, 2: 3, 5: 8, 10: 20}.get(st.session_state.speed_multiplier, 3)
+    # 0.7s cadence gives ample time for WebGL shaders to finish drawing without context loss
+    time.sleep(0.7)
+    step_jump = {1: 2, 2: 5, 5: 12, 10: 25}.get(st.session_state.speed_multiplier, 5)
     st.session_state.step_idx = min(st.session_state.step_idx + step_jump, total_steps - 1)
     if st.session_state.step_idx >= total_steps - 1:
         st.session_state.is_playing = False

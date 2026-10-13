@@ -620,12 +620,26 @@ def render_dashboard():
 
         with col_cad:
             st.markdown("##### 🔬 Multi-Layer 3D Cylindrical CAD Cutaway Model")
-            st.caption("Shaded cutaway with animated thermal glow and coolant paths. Drag the cell for a full 360° view.")
+            st.caption("Start with the complete 3D cell. Adjust the zoom slider to open an animated, layer-by-layer view of its interior.")
+            battery_zoom_pct = st.slider(
+                "Exploded layer zoom · 100% assembled → 175% inner core",
+                min_value=100,
+                max_value=175,
+                value=100,
+                step=1,
+                key="battery_zoom_pct",
+                help="Keep this slider at your chosen layer while playback heats and cools the battery.",
+            )
+            battery_zoom = battery_zoom_pct / 100.0
             view_opt = "Isometric 3D Cutaway"
 
             # Self-contained SVG/HTML viewer: heat bloom and coolant flow animate
             # in the browser at display refresh rate without rerunning Streamlit.
             thermal_level = min(1.0, max(0.0, (curr_core_t - 25.0) / 30.0))
+            previous_core_t = float(df.iloc[max(0, curr_step - 1)]["estimated_core_temp_c"]) + (ambient_temp_mod - 25.0) * 0.1
+            if inject_fault:
+                previous_core_t += 5.2
+            previous_thermal_level = min(1.0, max(0.0, (previous_core_t - 25.0) / 30.0))
             trend = float(curr_row["estimated_core_temp_c"] - df.iloc[max(0, curr_step - 1)]["estimated_core_temp_c"])
             thermal_mode = "HEATING" if trend >= 0 else "COOLING"
             battery_view = f"""
@@ -640,8 +654,25 @@ def render_dashboard():
               .live {{ color:#a7f3d0; border:1px solid #10b98166; background:#062c2780; border-radius:99px; padding:6px 10px; font:10px ui-monospace,monospace; }}
               .live i {{ display:inline-block; width:7px; height:7px; border-radius:50%; background:#34d399; margin-right:6px; box-shadow:0 0 10px #34d399; animation:pulse 1.4s infinite; }}
               svg {{ width:100%; height:100%; position:absolute; inset:0; }}
-              .shell {{ transform-box:fill-box; transform-origin:center; transform-style:preserve-3d; cursor:grab; touch-action:none; }}
-              .shell:active {{ cursor:grabbing; }}
+              .shell {{ transform-box:fill-box; transform-origin:center; transform-style:preserve-3d; }}
+              .cyl-scene {{ position:absolute; z-index:1; inset:54px 0 42px; perspective:900px; perspective-origin:50% 48%; overflow:hidden; }}
+              .cyl-ground {{ position:absolute; left:50%; top:79%; width:190px; height:32px; margin-left:-95px; border-radius:50%; background:#02061799; filter:blur(8px); }}
+              .cyl-cell {{ position:absolute; left:50%; top:51%; width:0; height:0; transform-style:preserve-3d; outline:none; will-change:transform; }}
+              .cyl-face,.cyl-foil {{ position:absolute; left:50%; top:50%; transform-style:preserve-3d; backface-visibility:hidden; }}
+              .cyl-layer {{ position:absolute; inset:0; transform-style:preserve-3d; opacity:0; visibility:hidden; transition:opacity .5s ease,filter .5s ease,transform .65s cubic-bezier(.2,.75,.2,1); }}
+              .cyl-layer.is-visible {{ visibility:visible; }}
+              .cyl-layer.is-selected {{ opacity:1!important; filter:drop-shadow(0 0 13px var(--layer-glow)); }}
+              .cyl-face {{ width:10px; height:230px; margin:-115px -5px; border-left:1px solid #e2e8f044; border-right:1px solid #02061744; background:linear-gradient(90deg,#475569,#dbeafe 18%,#94a3b8 38%,#e2e8f0 51%,#475569 72%,#cbd5e1 88%,#334155); box-shadow:inset 0 0 5px #02061788; transition:opacity .3s ease; }}
+              .cyl-foil {{ width:8px; height:202px; margin:-101px -4px; background:repeating-linear-gradient(180deg,#38bdf8 0 15px,#172554 15px 21px,#fb923c 21px 36px,#422006 36px 42px); border-left:1px solid #fef3c733; border-right:1px solid #02061766; }}
+              .cyl-insulation {{ position:absolute; left:50%; top:50%; width:6px; height:214px; margin:-107px -3px; background:linear-gradient(90deg,#fbbf24,#fef3c7 50%,#d97706); border-inline:1px solid #fff7ed88; }}
+              .cyl-separator {{ position:absolute; left:50%; top:50%; width:3px; height:196px; margin:-98px -1.5px; background:linear-gradient(90deg,#fef3c766,#fff7eddd,#fef3c766); }}
+              .cyl-cap {{ position:absolute; left:50%; top:50%; width:150px; height:150px; margin:-75px; border-radius:50%; backface-visibility:visible; }}
+              .cyl-cap.top {{ transform:translateY(-115px) rotateX(90deg); background:radial-gradient(circle at 50% 50%,#e2e8f0 0 12%,#64748b 13% 21%,#dbeafe 22% 27%,#94a3b8 28% 68%,#334155 69% 76%,#cbd5e1 77% 82%,#475569 83%); border:2px solid #e2e8f0aa; box-shadow:0 0 18px #93c5fd44; }}
+              .cyl-cap.bottom {{ transform:translateY(115px) rotateX(90deg); background:radial-gradient(circle,#475569 0 67%,#94a3b8 68% 76%,#1e293b 77%); border:2px solid #cbd5e166; }}
+              .cyl-core {{ position:absolute; left:50%; top:50%; width:35px; height:168px; margin:-84px -17.5px; transform:translateZ(58px); border-radius:50%; background:radial-gradient(ellipse at 50% 45%,#fff7ad 0,#fb7185 24%,#dc262ccc 58%,#7f1d1d00 100%); filter:drop-shadow(0 0 14px #fb7185cc); }}
+              .cyl-core-glow {{ position:absolute; left:50%; top:50%; width:100px; height:208px; margin:-104px -50px; transform:translateZ(57px); border-radius:50%; pointer-events:none; background:radial-gradient(ellipse,#ff362b99 0%,#ef444477 35%,#dc262622 67%,transparent 100%); filter:blur(9px); opacity:0; }}
+              .cyl-pipe {{ position:absolute; left:50%; top:50%; width:7px; height:205px; margin:-102px -3.5px; border-radius:9px; transform-style:preserve-3d; transform:rotateY(var(--angle)) translateZ(77px); background:repeating-linear-gradient(180deg,#67e8f9 0 5px,transparent 5px 15px); filter:drop-shadow(0 0 5px #38bdf8); animation:cyl-flow 1.1s linear infinite; }}
+              .cyl-edge {{ position:absolute; left:50%; top:50%; width:2px; height:228px; margin:-114px -1px; transform:rotateY(var(--angle)) translateZ(69px); background:linear-gradient(transparent,#7dd3fcaa 12%,#e0f2fe 50%,#7dd3fcaa 88%,transparent); box-shadow:0 0 8px #38bdf877; }}
               .heat {{ opacity:.78; animation:heat 2.4s ease-in-out infinite alternate; }}
               .air {{ stroke-dasharray:5 13; animation:flow 1.6s linear infinite; }}
               .air.delay {{ animation-delay:-.8s; }}
@@ -651,6 +682,11 @@ def render_dashboard():
               .data-card small {{ display:block; color:#8298b2; font-size:9px; letter-spacing:1px; text-transform:uppercase; }}
               .data-card strong {{ display:block; font:700 22px ui-monospace,monospace; margin:4px 0 10px; color:#fda4af; }}
               .data-card .secondary {{ color:#7dd3fc; font-size:14px; margin:4px 0 0; }}
+              .layer-card {{ position:absolute; z-index:3; left:16px; top:66px; width:226px; padding:12px; border:1px solid #ffffff20; border-radius:12px; background:#08111de8; backdrop-filter:blur(10px); box-shadow:0 12px 35px #0006; }}
+              .layer-card small {{ display:block; color:#8298b2; font-size:9px; letter-spacing:1px; text-transform:uppercase; }}
+              .layer-name {{ color:#e5eefb; font-size:13px; font-weight:700; margin:5px 0 3px; }}
+              .layer-desc {{ min-height:27px; color:#9cafc4; font-size:10px; line-height:1.35; }}
+              .zoom-readout {{ color:#7dd3fc; font:10px ui-monospace,monospace; margin-top:6px; }}
               .bar {{ height:4px; border-radius:5px; margin-top:10px; background:linear-gradient(90deg,#38bdf8,#facc15,#fb7185); position:relative; }}
               .bar b {{ position:absolute; top:-3px; left:calc(var(--heat) * 100%); width:10px; height:10px; border-radius:50%; background:#fff; box-shadow:0 0 10px #fff; }}
               .legend {{ position:absolute; z-index:2; bottom:14px; left:18px; display:flex; gap:14px; color:#9cafc4; font-size:10px; }}
@@ -659,7 +695,9 @@ def render_dashboard():
               @keyframes pulse {{ 50% {{ opacity:.45; transform:scale(.8); }} }}
               @keyframes heat {{ to {{ opacity:1; filter:drop-shadow(0 0 12px #fb7185aa); }} }}
               @keyframes flow {{ to {{ stroke-dashoffset:-36; }} }}
-              @media(max-width:650px) {{ .data-card {{ right:8px; top:58px; transform:scale(.82); transform-origin:top right; }} .topline {{ left:12px; right:12px; }} .footer {{ display:none; }} }}
+              @keyframes cyl-flow {{ to {{ background-position:0 20px; }} }}
+              @media(max-width:650px) {{ .cyl-cell {{ zoom:.78; }} }}
+              @media(max-width:650px) {{ .data-card {{ right:8px; top:58px; transform:scale(.82); transform-origin:top right; }} .layer-card {{ left:8px; top:58px; width:190px; transform:scale(.82); transform-origin:top left; }} .topline {{ left:12px; right:12px; }} .footer {{ display:none; }} }}
             </style></head><body>
             <div class="stage" style="--heat:{thermal_level:.3f}">
               <div class="topline"><div><div class="eyebrow">LIVE CELL THERMAL CUTAWAY</div><div style="color:#d7e5f5;font-size:11px;margin-top:4px">21700 · LG M50 · 5.0 Ah</div></div><div class="live"><i></i>{thermal_mode} · T+ {curr_time:.1f}s</div></div>
@@ -712,30 +750,127 @@ def render_dashboard():
                 <path class="label-line" d="M430 207 L532 190 L575 190"/><text x="582" y="193" class="tag">ELECTRODE WINDING</text>
                 <path class="label-line" d="M402 241 L535 260 L575 260"/><text x="582" y="263" class="tag">AI CORE HOTSPOT</text>
                 <path class="label-line" d="M483 310 L535 330 L575 330"/><text x="582" y="333" class="tag">LIQUID COOLANT FLOW</text>
-                <text x="28" y="444" class="tag">DRAG BATTERY · 360° ROTATION</text>
+                <text x="28" y="444" class="tag">LAYER-BY-LAYER CELL VIEW</text>
               </svg>
               <div class="data-card"><small>Inferred core</small><strong id="core-reading">{curr_core_t:.1f}°C</strong><small>Surface sensor</small><div class="secondary" id="surface-reading">{curr_surf_t:.1f}°C</div><div class="bar"><b id="heat-marker"></b></div><small id="delta-reading" style="margin-top:8px">ΔT {curr_delta_t:+.1f}°C · coolant {curr_coolant:.0f}%</small></div>
               <div class="legend"><span style="--dot:#38bdf8">Coolant</span><span style="--dot:#fb923c">Electrode</span><span style="--dot:#fb7185">Thermal core</span></div>
-              <div class="footer">VIEW · {view_opt.upper()} &nbsp; / &nbsp; DRAG TO ROTATE · 360°</div>
+              <div class="layer-card" aria-label="Battery layer explorer">
+                <small>Interactive exploded layer view</small>
+                <div class="layer-name" id="layer-name">Complete cell · assembled</div>
+                <div class="layer-desc" id="layer-desc">All six internal layers are visible inside the complete cell.</div>
+                <div class="zoom-readout" id="zoom-readout">100% · ASSEMBLED</div>
+              </div>
+              <div class="footer">USE THE ZOOM CONTROL TO OPEN THE CELL LAYER BY LAYER</div>
             </div>
             <script>
-              const shell = document.getElementById('battery-shell');
-              let rotation = 0, tilt = 0, dragPoint = null;
-              shell.addEventListener('pointerdown', event => {{
-                dragPoint = {{ x: event.clientX, y: event.clientY }};
-                shell.setPointerCapture(event.pointerId);
-                event.preventDefault();
-              }});
-              shell.addEventListener('pointermove', event => {{
-                if (!dragPoint) return;
-                rotation = (rotation + (event.clientX - dragPoint.x) * 0.8) % 360;
-                tilt = Math.max(-22, Math.min(22, tilt + (event.clientY - dragPoint.y) * 0.35));
-                dragPoint = {{ x: event.clientX, y: event.clientY }};
-                shell.style.transform = `perspective(1100px) rotateX(${{tilt}}deg) rotateY(${{rotation}}deg)`;
-              }});
-              const stopDrag = () => {{ dragPoint = null; }};
-              shell.addEventListener('pointerup', stopDrag);
-              shell.addEventListener('pointercancel', stopDrag);
+              // Replace the flat illustration with a true CSS 3D faceted cylinder.
+              const oldSvg = document.querySelector('.stage > svg');
+              const scene3d = document.createElement('div');
+              scene3d.className = 'cyl-scene';
+              scene3d.setAttribute('role', 'img');
+              scene3d.setAttribute('aria-label', '3D cylindrical battery with exposed electrode winding and thermal core');
+              const ground = document.createElement('div');
+              ground.className = 'cyl-ground';
+              scene3d.appendChild(ground);
+              const model = document.createElement('div');
+              model.className = 'cyl-cell';
+              model.id = 'battery-shell-3d';
+              model.setAttribute('aria-label', 'Battery cylinder. Use the zoom control to inspect each internal layer.');
+              scene3d.appendChild(model);
+              const addPart = (parent, className, extraStyle) => {{
+                const part = document.createElement('div');
+                part.className = className;
+                if (extraStyle) part.style.cssText = extraStyle;
+                parent.appendChild(part);
+                return part;
+              }};
+              const coolantLayer = addPart(model, 'cyl-layer');
+              const canLayer = addPart(model, 'cyl-layer');
+              addPart(canLayer, 'cyl-cap top');
+              addPart(canLayer, 'cyl-cap bottom');
+              const insulationLayer = addPart(model, 'cyl-layer');
+              const electrodeLayer = addPart(model, 'cyl-layer');
+              const separatorLayer = addPart(model, 'cyl-layer');
+              const coreLayer = addPart(model, 'cyl-layer');
+              const foil = electrodeLayer;
+              const skin = canLayer;
+              const canFaces = [];
+              for (let i = 0; i < 64; i++) {{
+                const angle = i * 360 / 64;
+                const signedAngle = ((angle + 180) % 360) - 180;
+                const windingFace = document.createElement('span');
+                windingFace.className = 'cyl-foil';
+                windingFace.style.transform = `translate(-50%,-50%) rotateY(${{angle}}deg) translateZ(54px)`;
+                foil.appendChild(windingFace);
+                const canFace = document.createElement('span');
+                canFace.className = 'cyl-face';
+                canFace.dataset.angle = signedAngle;
+                canFace.style.transform = `translate(-50%,-50%) rotateY(${{angle}}deg) translateZ(74px)`;
+                skin.appendChild(canFace);
+                canFaces.push(canFace);
+                const insulationFace = document.createElement('span');
+                insulationFace.className = 'cyl-insulation';
+                insulationFace.style.transform = `translate(-50%,-50%) rotateY(${{angle}}deg) translateZ(65px)`;
+                insulationLayer.appendChild(insulationFace);
+                const separatorFace = document.createElement('span');
+                separatorFace.className = 'cyl-separator';
+                separatorFace.style.transform = `translate(-50%,-50%) rotateY(${{angle}}deg) translateZ(47px)`;
+                separatorLayer.appendChild(separatorFace);
+              }}
+              const thermalCore = addPart(coreLayer, 'cyl-core');
+              const coreGlow = addPart(coreLayer, 'cyl-core-glow');
+              addPart(coolantLayer, 'cyl-pipe', '--angle:55deg');
+              addPart(coolantLayer, 'cyl-pipe', '--angle:-55deg;animation-delay:-.55s');
+              addPart(coolantLayer, 'cyl-edge', '--angle:-42deg');
+              addPart(coolantLayer, 'cyl-edge', '--angle:42deg');
+              const layerNames = ['Liquid coolant jacket', 'Stainless-steel outer can', 'Electrical insulation sleeve', 'Electrode winding', 'Porous separator', 'Thermal core hotspot'];
+              const layerDescriptions = ['Circulating water-glycol channels around the cell.', 'Protective metal casing that contains the cell.', 'Thin insulating sleeve between casing and electrodes.', 'Rolled anode and cathode foils store electrochemical energy.', 'Microporous separator keeps electrodes apart inside the cell.', 'Deep inner region where the simulated heat hotspot develops.'];
+              const layerColors = ['#38bdf8', '#cbd5e1', '#fbbf24', '#fb923c', '#fef3c7', '#fb7185'];
+              const layers = [coolantLayer, canLayer, insulationLayer, electrodeLayer, separatorLayer, coreLayer];
+              let zoomLevel = 1, activeLayer = -1;
+              const setZoom = (value) => {{
+                zoomLevel = Math.max(1, Math.min(1.75, value));
+                activeLayer = zoomLevel < 1.07 ? -1 : Math.min(5, Math.floor((zoomLevel - 1.07) / .136));
+                const opened = activeLayer >= 0;
+                const gap = opened ? Math.min(11, (zoomLevel - 1.07) * 17) : 0;
+                layers.forEach((layer, layerIndex) => {{
+                  const visible = true;
+                  const selected = activeLayer === layerIndex || (activeLayer < 0 && layerIndex === 1);
+                  layer.classList.toggle('is-visible', visible);
+                  layer.classList.toggle('is-selected', selected);
+                  layer.style.opacity = visible ? (selected ? '1' : '.50') : '0';
+                  layer.style.transform = opened ? `translateY(${{(layerIndex - activeLayer) * gap}}px)` : 'translateY(0px)';
+                  layer.style.setProperty('--layer-glow', layerColors[layerIndex]);
+                }});
+                // Keep a cutaway window open even when fully assembled so all
+                // six internal layers can be seen together. Zooming opens it fully.
+                const opening = Math.max(.58, Math.min(1, (zoomLevel - 1.02) / .20));
+                canFaces.forEach(face => {{
+                  const isFrontCutaway = Math.abs(Number(face.dataset.angle)) <= 42;
+                  face.style.opacity = isFrontCutaway ? (1 - opening).toFixed(2) : '1';
+                  face.style.visibility = isFrontCutaway && opening > .97 ? 'hidden' : 'visible';
+                }});
+                model.style.transform = `rotateX(-8deg) scale(${{zoomLevel}})`;
+                document.getElementById('zoom-readout').textContent = `${{Math.round(zoomLevel * 100)}}% · ${{opened ? `LAYER ${{activeLayer + 1}} / 6` : 'ASSEMBLED'}}`;
+                document.getElementById('layer-name').textContent = opened ? layerNames[activeLayer] : 'Complete cell · assembled';
+                document.getElementById('layer-desc').textContent = opened ? layerDescriptions[activeLayer] : 'All six internal layers are visible inside the complete cell.';
+              }};
+              const heatStart = {previous_thermal_level:.3f}, heatTarget = {thermal_level:.3f};
+              const heatStartedAt = performance.now();
+              const animateHeat = (now) => {{
+                const progress = Math.min(1, (now - heatStartedAt) / 680);
+                const eased = progress * progress * (3 - 2 * progress);
+                const level = heatStart + (heatTarget - heatStart) * eased;
+                thermalCore.style.opacity = (0.12 + level * 0.88).toFixed(3);
+                thermalCore.style.filter = `drop-shadow(0 0 ${{(3 + level * 24).toFixed(1)}}px rgba(248, 55, 55, ${{(0.18 + level * 0.78).toFixed(2)}}))`;
+                thermalCore.style.transform = `translateZ(58px) scale(${{(0.94 + level * 0.12).toFixed(3)}})`;
+                coreGlow.style.opacity = (0.03 + level * 0.94).toFixed(3);
+                coreGlow.style.filter = `blur(${{(12 - level * 5).toFixed(1)}}px) saturate(${{(0.7 + level * 1.3).toFixed(2)}})`;
+                if (progress < 1) requestAnimationFrame(animateHeat);
+              }};
+              requestAnimationFrame(animateHeat);
+              oldSvg.replaceWith(scene3d);
+              setZoom({battery_zoom:.3f});
             </script>
             </body></html>
             """
